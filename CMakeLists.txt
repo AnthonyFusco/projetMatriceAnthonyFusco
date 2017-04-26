@@ -12,3 +12,5 @@ SET(CMAKE_C_COMPILER mpicc)
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fopenmp -Wall")
 
 add_executable(projetMatriceAnthonyFusco ${SOURCE_FILES})
+
+target_link_libraries(projetMatriceAnthonyFusco m)

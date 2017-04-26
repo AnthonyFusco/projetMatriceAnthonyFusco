@@ -1,8 +1,9 @@
-#include <mpi.h>
-#include <stdio.h>
-#include <omp.h>
 #include <stdlib.h>
+#include <stdio.h>
+#include <math.h>
 #include <assert.h>
+#include <omp.h>
+#include <mpi.h>
 
 void mpi() {
     // Initialize the MPI environment
@@ -66,13 +67,11 @@ void initMatrix(Matrix* matrix, long lines, long column) {
     }
 }
 
-
 int get(Matrix* matrix, long line, long column) {
     assert(line < matrix->lines);
     assert(column < matrix->columns);
     return matrix->tab[column + line * matrix->columns];
 }
-
 
 void set(Matrix* matrix, long line, long column, int value) {
     assert(line < matrix->lines);
@@ -80,46 +79,24 @@ void set(Matrix* matrix, long line, long column, int value) {
     matrix->tab[column + line * matrix->columns] = value;
 }
 
-long countLinesOfFile(char* fileName) {
-    int ch = 0;
-    long lines = 0;
-    FILE *file;
-    file = fopen(fileName, "r");
-    if (file) {
-        while (!feof(file)) {
-            ch = fgetc(file);
-            if (ch == '\n') {
-                lines++;
-            }
-        }
-        fclose(file);
-    }
-    return lines;
-}
-
-long countColumnsOfFile(char* fileName) {
-    long columns = 0;
-    int ch = 0;
+long countElementOfFile(char* fileName) {
     int elem = 0;
+    long nbElem = 0;
     FILE *file;
     file = fopen(fileName, "r");
     if (file) {
         while (fscanf(file, "%d", &elem) > 0) {
-            columns++;
-            ch = fgetc(file);
-            if (ch == '\n') {
-                fclose(file);
-                return columns;
-            }
+            nbElem++;
         }
         fclose(file);
     }
-    return columns;
+    return nbElem;
 }
 
 void readMatrixFromFile(Matrix* matrix, char* fileName) {
-    long lines = countLinesOfFile(fileName);
-    long columns = countColumnsOfFile(fileName);
+    long nbElement = countElementOfFile(fileName);
+    long lines = (long) sqrt(nbElement);
+    long columns = (long) sqrt(nbElement);
     initMatrix(matrix, lines, columns);
     int elem;
     FILE *file;
@@ -133,7 +110,6 @@ void readMatrixFromFile(Matrix* matrix, char* fileName) {
         fclose(file);
     }
 }
-
 
 void printMatrix(Matrix* matrix) {
     for (int i = 0; i < matrix->lines; ++i) {
@@ -154,13 +130,14 @@ int main(int argc, char** argv) {
 
     Matrix A;
     readMatrixFromFile(&A, AFileName);
-    //printMatrix(&A);
+    printMatrix(&A);
 
     char* BFileName = argv[2];
 
     Matrix B;
     readMatrixFromFile(&B, BFileName);
-    //printMatrix(&B);
+    printf("\n");
+    printMatrix(&B);
 }
 
 
