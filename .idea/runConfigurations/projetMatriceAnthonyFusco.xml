@@ -1,5 +1,5 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="projetMatriceAnthonyFusco" type="CMakeRunConfiguration" factoryName="Application" PROGRAM_PARAMS="-np 5 cmake-build-debug/projetMatriceAnthonyFusco C D" WORKING_DIR="file://$PROJECT_DIR$" PASS_PARENT_ENVS_2="true" PROJECT_NAME="projetMatriceAnthonyFusco" TARGET_NAME="projetMatriceAnthonyFusco" CONFIG_NAME="Debug" RUN_PATH="/usr/bin/mpirun">
+  <configuration default="false" name="projetMatriceAnthonyFusco" type="CMakeRunConfiguration" factoryName="Application" PROGRAM_PARAMS="-np 5 cmake-build-debug/projetMatriceAnthonyFusco A B" WORKING_DIR="file://$PROJECT_DIR$" PASS_PARENT_ENVS_2="true" PROJECT_NAME="projetMatriceAnthonyFusco" TARGET_NAME="projetMatriceAnthonyFusco" CONFIG_NAME="Debug" RUN_PATH="/usr/bin/mpirun">
     <envs />
     <method />
   </configuration>
