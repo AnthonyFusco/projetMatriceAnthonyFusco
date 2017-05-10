@@ -170,15 +170,14 @@ int* scatter(long* size, Matrix* matrix, int world_size) {
 }
 */
 
-Matrix scatter(long* size, Matrix* matrix, int world_size) {
-    MPI_Bcast(size, 1, MPI_LONG, 0, MPI_COMM_WORLD);
-    int numberElement = (int) ((*size * *size) / world_size);
+Matrix scatter(long size, Matrix* matrix, int world_size) {
+    int numberElement = (int) ((size * size) / world_size);
     int* buffer = malloc(sizeof(int) * numberElement);
     MPI_Scatter(matrix->tab, numberElement, MPI_INT, buffer,
                 numberElement, MPI_INT, 0, MPI_COMM_WORLD);
     Matrix result;
-    result.lines = *size / world_size;
-    result.columns = *size;
+    result.lines = size / world_size;
+    result.columns = size;
     result.tab = buffer;
     return result;
 }
@@ -196,22 +195,17 @@ int main(int argc, char** argv) {
 
     Matrix A;
     Matrix BTurned;
-    long sizeA;
-    long sizeB;
+    long size; //number of element per line
 
     if (world_rank == 0) {
         char* AFileName = argv[1];
         readMatrixFromFile(&A, AFileName);
-        //printMatrix(&A);
         char *BFileName = argv[2];
         Matrix B;
         readMatrixFromFile(&B, BFileName);
-        //printMatrix(&B);
         Matrix turned;
         turnMatrix(&B, &turned);
-        //printMatrix(&turned);
-        sizeA = A.lines;
-        sizeB = turned.lines;
+        size = A.lines;
         BTurned.tab = turned.tab;
         BTurned.lines = turned.lines;
         BTurned.columns = turned.columns;
@@ -229,33 +223,53 @@ int main(int argc, char** argv) {
     int* bufferB = malloc(sizeof(int) * numberElementB);
     MPI_Scatter(BTurned.tab, numberElementB, MPI_INT, bufferB,
                 numberElementB, MPI_INT, 0, MPI_COMM_WORLD);*/
+    MPI_Bcast(&size, 1, MPI_LONG, 0, MPI_COMM_WORLD);
+    Matrix receivedA = scatter(size, &A, world_size);
+    //Matrix receivedB = scatter(size, &BTurned, world_size);
 
-    Matrix receivedA = scatter(&sizeA, &A, world_size);
-    Matrix receivedB = scatter(&sizeB, &BTurned, world_size);
-
-   /* Matrix receivedA;
-    receivedA.lines = sizeA / world_size;
-    receivedA.columns = sizeA;
-    receivedA.tab = bufferA;*/
-    printf("I am proc %d, %d\n", world_rank, (int) sizeA);
+    printf("I am proc %d, %d\n", world_rank, (int) size);
     printMatrix(&receivedA);
 
-    /*Matrix receivedB;
-    receivedB.lines = sizeB / world_size;
-    receivedB.columns = sizeB;
-    receivedB.tab = bufferB;*/
-    printf("I am proc %d, %d\n", world_rank, (int) sizeB);
-    printMatrix(&receivedB);
+    /*printf("I am proc %d, %d\n", world_rank, (int) size);
+    printMatrix(&receivedB);*/
 
-
-    //initb
-
+    /*Matrix afterCalcul;
+    afterCalcul.lines = receivedA.lines;
+    afterCalcul.columns = afterCalcul.columns;
+    afterCalcul.tab = receivedA.tab;*/
     //calc
+    /*if (world_rank == 0) {
+        MPI_Send(&receivedA, (int) ((size * size) / world_size), MPI_INT, world_rank + 1, 0, MPI_COMM_WORLD);
+    }
 
+    if (world_rank != world_size) {
+        MPI_Send(&afterCalcul, (int) ((size * size) / world_size) * world_rank, MPI_INT, world_rank + 1, 0, MPI_COMM_WORLD);
+    }
+
+    if (world_rank > 0) {
+        MPI_Recv(&afterCalcul, 1, MPI_INT, 0, 0, MPI_COMM_WORLD,
+                 MPI_STATUS_IGNORE);
+    }*/
     //gather
 
-    // Finalize the MPI environment.
+    Matrix gathered;
+    if (world_rank == 0) {
+        gathered.tab = malloc(sizeof(int) * size * size);
+        gathered.lines = size;
+        gathered.lines = size;
+    }
+
+    MPI_Gather(receivedA.tab, (int) (receivedA.lines * size), MPI_INT, gathered.tab, (int) (receivedA.lines * size), MPI_INT, 0, MPI_COMM_WORLD);
+
+
+
     MPI_Finalize();
+
+    if (world_rank == 0) {
+        printf("MATRIX GATHER\n");
+
+        printMatrix(&gathered);
+    }
 }
 
 
