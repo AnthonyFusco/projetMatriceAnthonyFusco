@@ -5,53 +5,6 @@
 #include <omp.h>
 #include <mpi.h>
 
-void mpi() {
-    // Initialize the MPI environment
-    MPI_Init(NULL, NULL);
-    //omp_set_num_threads(4);
-
-    // Get the number of processes
-    int world_size;
-    MPI_Comm_size(MPI_COMM_WORLD, &world_size);
-
-    // Get the rank of the process
-    int world_rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
-
-    // Get the name of the processor
-    char processor_name[MPI_MAX_PROCESSOR_NAME];
-    int name_len;
-    MPI_Get_processor_name(processor_name, &name_len);
-
-    int number;
-    if(world_rank == 0) {
-        /*for(int i = 1; i < world_size; i++) {
-            printf("send %d\n", world_rank);
-            number = i * 10;
-            MPI_Send(&number, 1, MPI_INT, i, 0, MPI_COMM_WORLD);
-        }*/
-
-// Create a buffer that will hold a subset of the random numbers
-        // float *sub_rand_nums = malloc(sizeof(float) * elements_per_proc);
-
-// Scatter the random numbers to all processes
-        //MPI_Scatter(rand_nums, elements_per_proc, MPI_FLOAT, sub_rand_nums,
-        //            elements_per_proc, MPI_FLOAT, 0, MPI_COMM_WORLD);
-    }
-
-    number = -1;
-    if(world_rank != 0) {
-        //printf("Goodbye from rank %d\n", world_rank);
-        MPI_Recv(&number, 1, MPI_INT, 0, 0, MPI_COMM_WORLD,
-                 MPI_STATUS_IGNORE);
-        printf("Process %d received number %d from process 0\n",
-               world_rank, number);
-    }
-
-    // Finalize the MPI environment.
-    MPI_Finalize();
-}
-
 typedef struct Matrix Matrix;
 struct Matrix {
     long lines;
@@ -128,6 +81,7 @@ void printMatrix(Matrix* matrix) {
 }
 
 void turnMatrix(Matrix* matrix, Matrix* turned) {
+    turned->tab = malloc(sizeof(int) * matrix->lines * matrix->lines);
     turned->columns = matrix->lines;
     turned->lines = matrix->columns;
     for(int i = 0; i < matrix->lines; i++){
@@ -137,44 +91,10 @@ void turnMatrix(Matrix* matrix, Matrix* turned) {
     }
 }
 
-void dispatchMatrix(long n){
-
-// Create a buffer that will hold a subset of the random numbers
-   // float *sub_rand_nums = malloc(sizeof(float) * elements_per_proc);
-
-// Scatter the random numbers to all processes
-    //MPI_Scatter(rand_nums, elements_per_proc, MPI_FLOAT, sub_rand_nums,
-    //            elements_per_proc, MPI_FLOAT, 0, MPI_COMM_WORLD);
-}
-
-void initMPI() {
-    MPI_Init(NULL, NULL);
-    //omp_set_num_threads(4);
-
-    // Get the number of processes
-    int world_size;
-    MPI_Comm_size(MPI_COMM_WORLD, &world_size);
-
-    // Get the rank of the process
-    int world_rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
-}
-/*
-int* scatter(long* size, Matrix* matrix, int world_size) {
-    MPI_Bcast(size, 1, MPI_LONG, 0, MPI_COMM_WORLD);
-    int numberElement = (int) ((*size * *size) / world_size);
-    int* buffer = malloc(sizeof(int) * numberElement);
-    MPI_Scatter(matrix->tab, numberElement, MPI_INT, buffer,
-                numberElement, MPI_INT, 0, MPI_COMM_WORLD);
-    return buffer;
-}
-*/
-
 Matrix scatter(long size, Matrix* matrix, int world_size) {
     int numberElement = (int) ((size * size) / world_size);
     int* buffer = malloc(sizeof(int) * numberElement);
-    MPI_Scatter(matrix->tab, numberElement, MPI_INT, buffer,
-                numberElement, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Scatter(matrix->tab, numberElement, MPI_INT, buffer, numberElement, MPI_INT, 0, MPI_COMM_WORLD);
     Matrix result;
     result.lines = size / world_size;
     result.columns = size;
@@ -194,7 +114,7 @@ int main(int argc, char** argv) {
     MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
 
     Matrix A;
-    Matrix BTurned;
+    Matrix turned;
     long size; //number of element per line
 
     if (world_rank == 0) {
@@ -203,12 +123,9 @@ int main(int argc, char** argv) {
         char *BFileName = argv[2];
         Matrix B;
         readMatrixFromFile(&B, BFileName);
-        Matrix turned;
         turnMatrix(&B, &turned);
+        printMatrix(&turned);
         size = A.lines;
-        BTurned.tab = turned.tab;
-        BTurned.lines = turned.lines;
-        BTurned.columns = turned.columns;
     }
 
     /*MPI_Bcast(&sizeA, 1, MPI_LONG, 0, MPI_COMM_WORLD);
@@ -225,19 +142,20 @@ int main(int argc, char** argv) {
                 numberElementB, MPI_INT, 0, MPI_COMM_WORLD);*/
     MPI_Bcast(&size, 1, MPI_LONG, 0, MPI_COMM_WORLD);
     Matrix receivedA = scatter(size, &A, world_size);
-    //Matrix receivedB = scatter(size, &BTurned, world_size);
+    Matrix receivedB = scatter(size, &turned, world_size);
 
     printf("I am proc %d, %d\n", world_rank, (int) size);
     printMatrix(&receivedA);
 
-    /*printf("I am proc %d, %d\n", world_rank, (int) size);
-    printMatrix(&receivedB);*/
+    printf("I am proc %d, %d\n", world_rank, (int) size);
+    printMatrix(&receivedB);
 
-    /*Matrix afterCalcul;
-    afterCalcul.lines = receivedA.lines;
-    afterCalcul.columns = afterCalcul.columns;
-    afterCalcul.tab = receivedA.tab;*/
+
     //calc
+    /*Matrix afterCalcul;
+afterCalcul.lines = receivedA.lines;
+afterCalcul.columns = afterCalcul.columns;
+afterCalcul.tab = receivedA.tab;*/
     /*if (world_rank == 0) {
         MPI_Send(&receivedA, (int) ((size * size) / world_size), MPI_INT, world_rank + 1, 0, MPI_COMM_WORLD);
     }
@@ -250,8 +168,8 @@ int main(int argc, char** argv) {
         MPI_Recv(&afterCalcul, 1, MPI_INT, 0, 0, MPI_COMM_WORLD,
                  MPI_STATUS_IGNORE);
     }*/
-    //gather
 
+    //gather
     Matrix gathered;
     if (world_rank == 0) {
         gathered.tab = malloc(sizeof(int) * size * size);
@@ -260,7 +178,6 @@ int main(int argc, char** argv) {
     }
 
     MPI_Gather(receivedA.tab, (int) (receivedA.lines * size), MPI_INT, gathered.tab, (int) (receivedA.lines * size), MPI_INT, 0, MPI_COMM_WORLD);
-
 
 
     MPI_Finalize();
