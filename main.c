@@ -102,6 +102,22 @@ Matrix scatter(long size, Matrix* matrix, int world_size) {
     return result;
 }
 
+void calcul(Matrix* A, Matrix* B, Matrix* result) {
+    result->tab = malloc(sizeof(int) * A->lines * A->columns);
+    result->lines = A->lines;
+    result->columns = B->lines;
+    int sum = 0;
+    for (int i = 0; i < A->lines; ++i) {
+        for (int j = 0; j < B->lines; ++j) {
+            sum = 0;
+            for (int k = 0; k < A->columns; ++k) {
+                sum += get(A, i, j) * get(B, i, j);
+            }
+            set(result, i, j, sum);
+        }
+    }
+}
+
 int main(int argc, char** argv) {
 
     MPI_Init(NULL, NULL);
@@ -124,7 +140,7 @@ int main(int argc, char** argv) {
         Matrix B;
         readMatrixFromFile(&B, BFileName);
         turnMatrix(&B, &turned);
-        printMatrix(&turned);
+        //printMatrix(&turned);
         size = A.lines;
     }
 
@@ -144,18 +160,19 @@ int main(int argc, char** argv) {
     Matrix receivedA = scatter(size, &A, world_size);
     Matrix receivedB = scatter(size, &turned, world_size);
 
-    printf("I am proc %d, %d\n", world_rank, (int) size);
+    /*printf("I am proc %d, %d\n", world_rank, (int) size);
     printMatrix(&receivedA);
 
     printf("I am proc %d, %d\n", world_rank, (int) size);
-    printMatrix(&receivedB);
+    printMatrix(&receivedB);*/
 
 
     //calc
-    /*Matrix afterCalcul;
-afterCalcul.lines = receivedA.lines;
-afterCalcul.columns = afterCalcul.columns;
-afterCalcul.tab = receivedA.tab;*/
+    Matrix afterCalcul;
+    calcul(&receivedA, &receivedB, &afterCalcul);
+    printf("afterCalcul\n");
+    printMatrix(&afterCalcul);
+
     /*if (world_rank == 0) {
         MPI_Send(&receivedA, (int) ((size * size) / world_size), MPI_INT, world_rank + 1, 0, MPI_COMM_WORLD);
     }
@@ -170,7 +187,7 @@ afterCalcul.tab = receivedA.tab;*/
     }*/
 
     //gather
-    Matrix gathered;
+    /*Matrix gathered;
     if (world_rank == 0) {
         gathered.tab = malloc(sizeof(int) * size * size);
         gathered.lines = size;
@@ -178,15 +195,15 @@ afterCalcul.tab = receivedA.tab;*/
     }
 
     MPI_Gather(receivedA.tab, (int) (receivedA.lines * size), MPI_INT, gathered.tab, (int) (receivedA.lines * size), MPI_INT, 0, MPI_COMM_WORLD);
-
+*/
 
     MPI_Finalize();
 
-    if (world_rank == 0) {
+    /*if (world_rank == 0) {
         printf("MATRIX GATHER\n");
 
         printMatrix(&gathered);
-    }
+    }*/
 }
 
 
