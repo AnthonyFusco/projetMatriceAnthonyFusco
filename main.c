@@ -17,9 +17,6 @@ void initMatrix(Matrix* matrix, long lines, long column) {
     matrix->lines = lines;
     matrix->columns = column;
     matrix->tab = malloc(sizeof(int) * size);
-    for (int i = 0; i < size; ++i) {
-        matrix->tab[i] = i;
-    }
 }
 
 int get(Matrix* matrix, long line, long column) {
@@ -84,7 +81,9 @@ void turnMatrix(Matrix* matrix, Matrix* turned) {
     turned->tab = malloc(sizeof(int) * matrix->lines * matrix->lines);
     turned->columns = matrix->lines;
     turned->lines = matrix->columns;
+    #pragma omp parallel for
     for(int i = 0; i < matrix->lines; i++){
+        #pragma omp parallel for
         for(int j = 0; j < matrix->columns; j++) {
             set(turned, j, i, get(matrix, i, j));
         }
@@ -102,18 +101,30 @@ Matrix scatter(long size, Matrix* matrix, int world_size) {
     return result;
 }
 
+/**
+ * Apply the matrix multiplication algorithm and reconstruct the matrix.
+ * B lines and column are considered inverted.
+ *
+ * @param A
+ * @param B
+ * @param result
+ * @param iteration The current segment of B being computed
+ * @param rank The current process in which the computation occurs
+ */
 void multiplyMatrix(Matrix* A, Matrix* B, Matrix* result, int iteration, int rank) {
     int sum = 0;
+    #pragma omp parallel for
     for (int i = 0; i < A->lines; ++i) {
+        #pragma omp parallel for
         for (int j = 0; j < B->lines; ++j) {
             sum = 0;
+            #pragma omp parallel for
             for (int k = 0; k < A->columns; ++k) {
                 sum += get(A, i, k) * get(B, j, k);
             }
-            //set(result, i, (j + iteration * A->lines), sum);
-            set(result, i, ((j + iteration * A->lines -
-                                              (A->columns -
-                                               (rank * A->lines))) % A->columns + A->columns) % A->columns, sum);
+            //Make sure to replace the result in the right place in the matrix
+            set(result, i, ((j + iteration * A->lines - (A->columns - (rank * A->lines)))
+                            % A->columns + A->columns) % A->columns, sum);
         }
     }
 }
@@ -126,7 +137,7 @@ void gather(Matrix* toSend, int size, Matrix* buffer) {
 int main(int argc, char** argv) {
 
     MPI_Init(NULL, NULL);
-    //omp_set_num_threads(4);
+    omp_set_num_threads(5);
 
     int world_size;
     MPI_Comm_size(MPI_COMM_WORLD, &world_size);
@@ -138,6 +149,7 @@ int main(int argc, char** argv) {
     Matrix turned;
     long size; //number of element per line
 
+    //Prepare the send -> read A and B, turn B
     if (world_rank == 0) {
         char* AFileName = argv[1];
         readMatrixFromFile(&A, AFileName);
@@ -145,53 +157,51 @@ int main(int argc, char** argv) {
         Matrix B;
         readMatrixFromFile(&B, BFileName);
         turnMatrix(&B, &turned);
-        size = A.lines;
+        size = A.columns;
     }
 
+    //Broadcast the column number of A, scatter a and B
     MPI_Bcast(&size, 1, MPI_LONG, 0, MPI_COMM_WORLD);
     Matrix receivedA = scatter(size, &A, world_size);
     Matrix receivedB = scatter(size, &turned, world_size);
 
-    //calc
+    //Initialize and compute the first step of the result matrix
     Matrix afterCalcul;
-    afterCalcul.tab = malloc(sizeof(int) * receivedA.lines * size);
-    afterCalcul.lines = receivedA.lines;
-    afterCalcul.columns = size;
+    initMatrix(&afterCalcul, receivedA.lines, size);
     multiplyMatrix(&receivedA, &receivedB, &afterCalcul, 0, world_rank);
 
+    //Send and receive parts of B from your neighbors,
+    //then multiply it to your result until you received all of B.
+    int prev;
+    int next;
+    #pragma omp parallel for
     for (int i = 1; i < world_size; ++i) {
-        int prev = (world_rank - 1) % world_size;
+        prev = (world_rank - 1) % world_size;
         if (world_rank == 0) {
             prev = world_size - 1;
         }
         MPI_Send(receivedB.tab, (int) (receivedB.lines * receivedB.columns), MPI_INT, prev, 0, MPI_COMM_WORLD);
 
-        int next = (world_rank + 1) % world_size;
+        next = (world_rank + 1) % world_size;
         MPI_Recv(receivedB.tab, (int) (receivedB.lines * receivedB.columns),
                  MPI_INT, next, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-        /*if (world_rank == 0) {
-            printMatrix(&afterCalcul);
-        }*/
+
         multiplyMatrix(&receivedA, &receivedB, &afterCalcul, i, world_rank);
     }
 
-    //gather
+    //Initialize, receive and print the final result.
     Matrix gathered;
     if (world_rank == 0) {
-        gathered.tab = malloc(sizeof(int) * size * size);
-        gathered.lines = size;
-        gathered.lines = size;
+        initMatrix(&gathered, size, size);
     }
 
     gather(&afterCalcul, (int) size, &gathered);
 
-    MPI_Finalize();
-
     if (world_rank == 0) {
-        printf("MATRIX GATHER\n");
-
         printMatrix(&gathered);
     }
+
+    MPI_Finalize();
 }
 
 
