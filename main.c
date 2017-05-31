@@ -174,7 +174,6 @@ int main(int argc, char** argv) {
     //then multiply it to your result until you received all of B.
     int prev;
     int next;
-    #pragma omp parallel for
     for (int i = 1; i < world_size; ++i) {
         prev = (world_rank - 1) % world_size;
         if (world_rank == 0) {
